@@ -4,7 +4,10 @@ import {
   Router,
   NavigationEnd,
 } from '@angular/router';
-import { NgRedux } from '@angular-redux/store';
+import {
+  NgRedux,
+  FunctionSelector,
+} from '@angular-redux/store';
 import { map } from 'rxjs/operators/map';
 import { filter } from 'rxjs/operators/filter';
 import { distinctUntilChanged } from 'rxjs/operators/distinctUntilChanged';
@@ -14,13 +17,12 @@ import { UPDATE_LOCATION } from './actions';
 import { RouterAction } from './reducer';
 
 @Injectable()
-export class NgReduxRouter {
+export class NgReduxRouter<RootState> {
   private initialized = false;
   private currentLocation: string;
   private initialLocation: string;
 
-  private selectLocationFromState: (state: any) => string = state =>
-    state.router;
+  private stateLocationSelector: FunctionSelector<RootState, string>;
   private urlState$: Observable<string>;
 
   private urlStateSubscription: ISubscription;
@@ -28,7 +30,7 @@ export class NgReduxRouter {
 
   constructor(
     private router: Router,
-    private ngRedux: NgRedux<any>,
+    private ngRedux: NgRedux<RootState>,
     private location: Location
   ) {}
 
@@ -69,7 +71,7 @@ export class NgReduxRouter {
    * example in the constructor of your root component.
    *
    *
-   * @param {(state: any) => string} selectLocationFromState Optional: If your
+   * @param {(state: any) => string} stateLocationSelector Optional: If your
    * router state is in a custom location, supply this argument to tell the
    * bindings where to find the router location in the state.
    * @param {Observable<string>} urlState$ Optional: If you have a custom setup
@@ -77,12 +79,12 @@ export class NgReduxRouter {
    * you can supply this argument as an Observable of the current url state.
    */
   initialize(
-    selectLocationFromState: (state: any) => string = state => state.router,
-    urlState$: Observable<string> | undefined = undefined
+    stateLocationSelector: FunctionSelector<RootState, string>,
+    urlState$?: Observable<string>
   ) {
     this.initializedInvariant();
 
-    this.selectLocationFromState = selectLocationFromState;
+    this.stateLocationSelector = stateLocationSelector;
 
     this.urlState$ = urlState$ || this.getDefaultUrlStateObservable();
 
@@ -94,17 +96,17 @@ export class NgReduxRouter {
   /**
    * Creates a unidirectional binding from the router state to Angular.
    * This allows you to control your router state in Redux externally and sync it
-   * with Angular.
-   *
-   * Note that because you are managing the router state externally, there is
+   * with Angular, where you control the router actions and reducers. Thus,
+   * because you are managing the router state externally there is
    * no need to setup additional router reducers provided by this library, and
-   * no router actions will be dispatched automatically.
+   * no @angular-redux/router actions will be dispatched.
    *
-   * @param {(state: any) => string} urlStateSelector
+   * @param {(state: any) => string} stateLocationSelector
    */
-  provideRouterState(urlStateSelector: (state: any) => string) {
+  provideRouterState(stateLocationSelector: FunctionSelector<RootState, string>) {
     this.initializedInvariant();
-    this.urlStateSubscription = this.ngRedux.select(urlStateSelector)
+    this.stateLocationSelector = stateLocationSelector;
+    this.urlStateSubscription = this.ngRedux.select(this.stateLocationSelector)
       .subscribe((url) => this.router.navigateByUrl(url));
     this.markAsInitialized();
   }
@@ -119,7 +121,7 @@ export class NgReduxRouter {
 
   private getLocationFromStore(useInitial: boolean = false) {
     return (
-      this.selectLocationFromState(this.ngRedux.getState()) ||
+      this.stateLocationSelector(this.ngRedux.getState()) ||
       (useInitial ? this.initialLocation : '')
     );
   }
@@ -144,7 +146,7 @@ export class NgReduxRouter {
         }
       }
 
-      this.ngRedux.dispatch(<RouterAction>{
+      this.ngRedux.dispatch<RouterAction>({
         type: UPDATE_LOCATION,
         payload: location
       });
@@ -171,7 +173,7 @@ export class NgReduxRouter {
     };
 
     this.reduxSubscription = this.ngRedux
-      .select(state => this.selectLocationFromState(state))
+      .select(state => this.stateLocationSelector(state))
       .pipe(distinctUntilChanged())
       .subscribe(handleLocationChange);
   }

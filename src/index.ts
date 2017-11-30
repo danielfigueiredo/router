@@ -3,6 +3,7 @@ import { NgModule } from '@angular/core';
 import { NgReduxRouter } from './router';
 import { RouterAction, routerReducer } from './reducer';
 import { UPDATE_LOCATION } from './actions';
+import { locationStateSelector } from './selector';
 
 @NgModule()
 export class NgReduxRouterModule {
@@ -14,4 +15,4 @@ export class NgReduxRouterModule {
   }
 }
 
-export { NgReduxRouter, RouterAction, routerReducer, UPDATE_LOCATION };
+export { NgReduxRouter, RouterAction, routerReducer, UPDATE_LOCATION, locationStateSelector };

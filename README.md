@@ -27,8 +27,8 @@ Bindings to connect @angular/router to @angular-redux/core
 3. Add the bindings to your root module.
   ```ts
   import { NgModule } from '@angular/core';
-  import { NgReduxModule, NgRedux } from '@angular-redux/core';
-  import { NgReduxRouterModule, NgReduxRouter } from '@angular-redux/router';
+  import { NgReduxModule, NgRedux } from '@angular-redux/store';
+  import { NgReduxRouterModule, NgReduxRouter, locationStateSelector } from '@angular-redux/router';
   import { RouterModule } from '@angular/router';
   import { routes } from './routes';
 
@@ -47,7 +47,7 @@ Bindings to connect @angular/router to @angular-redux/core
       ngReduxRouter: NgReduxRouter
     ) {
       ngRedux.configureStore(/* args */);
-      ngReduxRouter.initialize(/* args */);
+      ngReduxRouter.initialize(locationStateSelector);
     }
   }
 ```
@@ -68,6 +68,10 @@ through the router. This can be achieved by initializing the bindings with a sec
 The `urlState$` argument lets you give `NgReduxRouter` an `Observable<string>` of the current URL of the page.
 If this argument is not given to the bindings, it defaults to subscribing to the `@angular/router`'s events, and
 getting the URL from there.
+
+### What if I control my router state externally?
+
+
 
 ### Examples
 
