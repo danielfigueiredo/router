@@ -1,19 +1,17 @@
-import { map } from 'rxjs/operators/map';
-import { filter } from 'rxjs/operators/filter';
-import { distinctUntilChanged } from 'rxjs/operators/distinctUntilChanged';
-import { Injectable, ApplicationRef } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { Location } from '@angular/common';
 import {
   Router,
   NavigationEnd,
-  NavigationCancel,
-  DefaultUrlSerializer
 } from '@angular/router';
 import { NgRedux } from '@angular-redux/store';
+import { map } from 'rxjs/operators/map';
+import { filter } from 'rxjs/operators/filter';
+import { distinctUntilChanged } from 'rxjs/operators/distinctUntilChanged';
 import { Observable } from 'rxjs/Observable';
 import { ISubscription } from 'rxjs/Subscription';
 import { UPDATE_LOCATION } from './actions';
-import { RouterAction, DefaultRouterState } from './reducer';
+import { RouterAction } from './reducer';
 
 @Injectable()
 export class NgReduxRouter {
@@ -23,7 +21,7 @@ export class NgReduxRouter {
 
   private selectLocationFromState: (state: any) => string = state =>
     state.router;
-  private urlState: Observable<string>;
+  private urlState$: Observable<string>;
 
   private urlStateSubscription: ISubscription;
   private reduxSubscription: ISubscription;
@@ -31,7 +29,6 @@ export class NgReduxRouter {
   constructor(
     private router: Router,
     private ngRedux: NgRedux<any>,
-    private applicationRef: ApplicationRef,
     private location: Location
   ) {}
 
@@ -53,6 +50,18 @@ export class NgReduxRouter {
     this.initialized = false;
   }
 
+  private initializedInvariant() {
+    if (this.initialized) {
+      throw new Error(
+        '@angular-redux/router already initialized! If you meant to re-initialize, call destroy first.'
+      );
+    }
+  }
+
+  private markAsInitialized() {
+    this.initialized = true;
+  }
+
   /**
    * Initialize the bindings between @angular-redux/router and @angular/router
    *
@@ -71,19 +80,33 @@ export class NgReduxRouter {
     selectLocationFromState: (state: any) => string = state => state.router,
     urlState$: Observable<string> | undefined = undefined
   ) {
-    if (this.initialized) {
-      throw new Error(
-        '@angular-redux/router already initialized! If you meant to re-initialize, call destroy first.'
-      );
-    }
+    this.initializedInvariant();
 
     this.selectLocationFromState = selectLocationFromState;
 
-    this.urlState = urlState$ || this.getDefaultUrlStateObservable();
+    this.urlState$ = urlState$ || this.getDefaultUrlStateObservable();
 
     this.listenToRouterChanges();
     this.listenToReduxChanges();
-    this.initialized = true;
+    this.markAsInitialized();
+  }
+
+  /**
+   * Creates a unidirectional binding from the router state to Angular.
+   * This allows you to control your router state in Redux externally and sync it
+   * with Angular.
+   *
+   * Note that because you are managing the router state externally, there is
+   * no need to setup additional router reducers provided by this library, and
+   * no router actions will be dispatched automatically.
+   *
+   * @param {(state: any) => string} urlStateSelector
+   */
+  provideRouterState(urlStateSelector: (state: any) => string) {
+    this.initializedInvariant();
+    this.urlStateSubscription = this.ngRedux.select(urlStateSelector)
+      .subscribe((url) => this.router.navigateByUrl(url));
+    this.markAsInitialized();
   }
 
   private getDefaultUrlStateObservable() {
@@ -127,7 +150,7 @@ export class NgReduxRouter {
       });
     };
 
-    this.urlStateSubscription = this.urlState.subscribe(handleLocationChange);
+    this.urlStateSubscription = this.urlState$.subscribe(handleLocationChange);
   }
 
   private listenToReduxChanges() {
